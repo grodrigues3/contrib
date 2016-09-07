@@ -25,44 +25,54 @@ import (
 	"k8s.io/contrib/mungegithub/features"
 	"k8s.io/contrib/mungegithub/github"
 	"k8s.io/contrib/mungegithub/mungers/matchers/event"
+	"k8s.io/contrib/mungegithub/listeners"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	goGithub "github.com/google/go-github/github"
 )
 
-// LabelMunger will update a label on a PR based on how many lines are changed.
+// LabelListener will update a label on a PR based on how many lines are changed.
 // It will exclude certain files in it's calculations based on the config
 // file provided in --generated-files-config
-type LabelMunger struct {
+type LabelListener struct {
 	TriagerUrl string
 }
 
+var _ Listener = LabelListener{}
+var _ IssueEventListener = LabelListener{}
+
 // Initialize will initialize the munger
-func (LabelMunger) Initialize(config *github.Config, features *features.Features) error {
+func (LabelListener) Initialize(config *github.Config, features *features.Features) error {
 	return nil
 }
 
 // Name is the name usable in --pr-mungers
-func (LabelMunger) Name() string { return "issue-triager" }
+func (LabelListener) Name() string { return "issue-triager" }
 
 // RequiredFeatures is a slice of 'features' that must be provided
-func (LabelMunger) RequiredFeatures() []string { return []string{} }
+func (LabelListener) RequiredFeatures() []string { return []string{} }
 
 // AddFlags will add any request flags to the cobra `cmd`
-func (lm *LabelMunger) AddFlags(cmd *cobra.Command, config *github.Config) {
+func (lm *LabelListener) AddFlags(cmd *cobra.Command, config *github.Config) {
 	cmd.Flags().StringVar(&lm.TriagerUrl, "triager-url", "", "Url on which ml web service is listening")
 }
 
 func init() {
-	lm := &LabelMunger{}
-	RegisterMungerOrDie(lm)
+	lm := &LabelListener{}
+	RegisterListenerOrDie(lm)
+	RegisterIssueEventListener(lm)
+}
+func RegisterIssueEventListener(listener LabelListener) {
+}
+func RegisterListenerOrDie(listener LabelListener) {
 }
 
 // EachLoop is called at the start of every munge loop
-func (LabelMunger) EachLoop() error { return nil }
+func (LabelListener) EachLoop() error { return nil }
 
 // Munge is the workhorse the will actually make updates to the PR
-func (lm *LabelMunger) Munge(obj *github.MungeObject) {
+func (lm *LabelListener) ListenIssueEvent(obj *github.MungeObject) {
 	//this munger only works on issues
 	if obj.IsPR() {
 		return
@@ -171,4 +181,17 @@ func getHumanCorrectedLabel(obj *github.MungeObject, s string) *string {
 	obj.RemoveLabel(*lastHumanLabel.Label.Name)
 	obj.AddLabel(*lastHumanLabel.Label.Name)
 	return lastHumanLabel.Label.Name
+}
+
+type IssueEventListener struct {
+
+}
+
+func (IssueEventListener) ListenForIssueEvent(gEvent *goGithub.IssueEvent){
+	//handle the issue envet
+	myMatcher := event.And{event.HumanActor(), event.AddLabel{}}
+	if !myMatcher.Match(gEvent) {
+		return
+	}
+	//do some stuff
 }
