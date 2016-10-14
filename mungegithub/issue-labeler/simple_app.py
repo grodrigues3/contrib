@@ -30,6 +30,7 @@ app = Flask(__name__)
 #Parameters
 team_fn= "./models/trained_teams_model.pkl"
 component_fn= "./models/trained_components_model.pkl"
+area_fn = "./models/trained_area_model.pkl"
 logFile = "/tmp/issue-labeler.log"
 logSize = 1024*1024*100
 numFeatures = 262144
@@ -50,6 +51,9 @@ except:
   #don't remove any stopwords
   stopwords = []
 
+# let's help Phil by removing kubectl from all issues
+stopwords = stopwords + ['kubectl']
+
 @app.errorhandler(500)
 def internal_error(exception):
   return str(exception), 500
@@ -67,13 +71,19 @@ def get_labels():
     tokens = tokenize_stem_stop(" ".join([title, body]))
     team_mod = joblib.load(team_fn)
     comp_mod = joblib.load(component_fn)
+    area_mod = joblib.load(area_fn)
     vec = myHasher.transform([tokens])
     tlabel = team_mod.predict(vec)[0]
     clabel = comp_mod.predict(vec)[0]
-    return ",".join([tlabel, clabel])
+    alabel = area_mod.predict(vec)[0]
+    return ",".join([tlabel, clabel, alabel])
 
 
 def tokenize_stem_stop(inputString):
+    """
+    stems and removes stopwords from input string
+    returns: List[strings]
+    """
     inputString = inputString.encode('utf-8')
     curTitleBody = tokenizer.tokenize(inputString.decode('utf-8').lower())
     return map(myStemmer.stem, filter(lambda x: x not in stopwords, curTitleBody))
@@ -83,22 +93,22 @@ def tokenize_stem_stop(inputString):
 def update_model():
     """
     data should contain three fields
-      titles: list of titles
-      bodies: list of bodies
-      labels: list of list of labels
+      titles: List[string] 
+      bodies: List[string] 
+      labels: List[List[string]] 
     """
     data = request.json
     titles = data.get('titles')
     bodies = data.get('bodies')
     labels = data.get('labels')
 
-    tTokens = []
-    cTokens = []
-    team_labels = []
-    component_labels = []
+    # *Tokens are list of lists of strings
+    tTokens, cTokens, aTokens = [], [], []
+    team_labels, component_labels, area_labels = [], [], []
     for (title, body, label_list) in zip(titles, bodies, labels):
       tLabel = filter(lambda x: x.startswith('team'), label_list)
       cLabel = filter(lambda x: x.startswith('component'), label_list)
+      aLabel = filter(lambda x: x.startswith('area'), label_list)
       tokens = tokenize_stem_stop(" ".join([title, body]))
       if tLabel:
         team_labels += tLabel
@@ -106,9 +116,20 @@ def update_model():
       if cLabel:
         component_labels += cLabel
         cTokens += [tokens] 
+      if aLabel:
+        area_labels += aLabel
+        aTokens += [tokens] 
+    
+    # transform tokens into numerical vectors using Feature Hasher
+    # Hashing Trick
     tVec = myHasher.transform(tTokens)
     cVec = myHasher.transform(cTokens)
+    aVec = myHasher.transform(aTokens)
 
+    # For each of the three models, if there are new training examples (e.g. new 
+    # issues with team/ labels), check if we are updating an existing model (
+    # by checking if the model is stored in persistent storage).  If so, update
+    # it.  Otherwise, create a new SGD Classifier and train it.  
     if team_labels:
       if os.path.isfile(team_fn):
         team_model = joblib.load(team_fn)
@@ -126,9 +147,19 @@ def update_model():
         #no comp model stored so build a new one
         component_model = SGDClassifier(loss=myLoss, penalty=myPenalty, alpha=myAlpha) 
         component_model.fit(cVec, np.array(component_labels))
+
+    if area_labels:
+      if os.path.isfile(area_fn):
+        area_model = joblib.load(area_fn)
+        area_model.partial_fit(aVec, np.array(area_labels))
+      else:
+        #no area model stored so build a new one
+        area_model = SGDClassifier(loss=myLoss, penalty=myPenalty, alpha=myAlpha) 
+        area_model.fit(cVec, np.array(area_labels))
     
     joblib.dump(team_model, team_fn)
     joblib.dump(component_model, component_fn)
+    joblib.dump(area_model, area_fn)
     return "" 
 
 def configure_logger():
