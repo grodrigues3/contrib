@@ -118,6 +118,20 @@ func (h *ApprovalHandler) Munge(obj *github.MungeObject) {
 	}
 }
 
+//this is a utility function to delete old notifications that were created erroneously and are confusing
+func (h *ApprovalHandler) deleteOldNotifications(obj *github.MungeObject) error {
+	notificationMatcher := c.MungerNotificationName(approvalNotificationName)
+	comments, ok := obj.ListComments()
+	if !ok {
+		return fmt.Errorf("Unable to ListComments for %d", obj.Number())
+	}
+	notifications := c.FilterComments(comments, notificationMatcher)
+	for _, cmt := range notifications {
+		obj.DeleteComment(cmt)
+	}
+	return nil
+}
+
 func (h *ApprovalHandler) updateNotification(obj *github.MungeObject, ownersMap map[string]sets.String) error {
 	notificationMatcher := c.MungerNotificationName(approvalNotificationName)
 	comments, ok := obj.ListComments()
