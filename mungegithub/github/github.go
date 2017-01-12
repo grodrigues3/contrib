@@ -1879,6 +1879,7 @@ func (obj *MungeObject) ListComments(withListOpts ...WithListOpt) ([]*github.Iss
 		listOpts.ListOptions.Page = page
 		glog.V(8).Infof("Fetching page %d of comments for issue %d", page, issueNum)
 		comments, response, err := obj.config.client.Issues.ListComments(config.Org, config.Project, issueNum, listOpts)
+		glog.V(8).Infof("This is the response %+v", response)
 		config.analytics.ListComments.Call(config, response)
 		if err != nil {
 			glog.V(8).Infof("This is the error %v", err)
