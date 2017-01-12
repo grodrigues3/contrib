@@ -128,6 +128,7 @@ func (h *ApprovalHandler) updateNotification(obj *github.MungeObject, ownersMap 
 	notifications := c.FilterComments(comments, notificationMatcher)
 	latestNotification := notifications.GetLast()
 	if latestNotification == nil {
+		glog.Infof("Found %v comments for issue %d, %d of which were written by the bot", len(comments), *obj.Issue.Number, len(notifications))
 		body := h.getMessage(obj, ownersMap)
 		obj.WriteComment(body)
 	}

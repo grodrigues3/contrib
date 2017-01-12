@@ -1881,7 +1881,9 @@ func (obj *MungeObject) ListComments(withListOpts ...WithListOpt) ([]*github.Iss
 		comments, response, err := obj.config.client.Issues.ListComments(config.Org, config.Project, issueNum, listOpts)
 		config.analytics.ListComments.Call(config, response)
 		if err != nil {
+			glog.V(8).Infof("This is the error %v", err)
 			if tryNextPageAnyway {
+				glog.V(8).Infof("Try page anyway was true")
 				// Cached last page was actually truthful -- expected error.
 				break
 			}
