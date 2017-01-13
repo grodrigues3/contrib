@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/oauth2"
+
 	"github.com/golang/glog"
 	githubapi "github.com/google/go-github/github"
 	"github.com/spf13/cobra"
@@ -99,8 +101,15 @@ func (h *ApprovalHandler) Munge(obj *github.MungeObject) {
 	}
 
 	ownersMap := h.getApprovedOwners(files, createApproverSet(comments))
+	token := obj.Token()
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+	tc := oauth2.NewClient(oauth2.NoContext, ts)
 
-	if err := h.updateNotification(obj, ownersMap); err != nil {
+	client := githubapi.NewClient(tc)
+
+	if err := h.updateNotification(client, obj, ownersMap); err != nil {
 		return
 	}
 
@@ -118,15 +127,21 @@ func (h *ApprovalHandler) Munge(obj *github.MungeObject) {
 	}
 }
 
-func (h *ApprovalHandler) updateNotification(obj *github.MungeObject, ownersMap map[string]sets.String) error {
+func (h *ApprovalHandler) updateNotification(client *githubapi.Client, obj *github.MungeObject, ownersMap map[string]sets.String) error {
 	notificationMatcher := c.MungerNotificationName(approvalNotificationName)
 	comments, ok := obj.ListComments()
+	//comments, _, err := client.Issues.ListComments(obj.Org(), obj.Project(), *obj.Issue.Number, nil)
 	if !ok {
 		return fmt.Errorf("Unable to ListComments for %d", obj.Number())
 	}
+	//if err != nil {
+	//	glog.Errorf("Could not ListComments for PR %v", *obj.Issue.Number)
+	//}
 
 	notifications := c.FilterComments(comments, notificationMatcher)
 	latestNotification := notifications.GetLast()
+	//glog.Infof("Found this as latest notification: %v\n\n", *latestNotification.Body)
+	glog.Infof("Found %v comments for issue %d, %d of which were written by the bot", len(comments), *obj.Issue.Number, len(notifications))
 	if latestNotification == nil {
 		glog.Infof("Found %v comments for issue %d, %d of which were written by the bot", len(comments), *obj.Issue.Number, len(notifications))
 		body := h.getMessage(obj, ownersMap)

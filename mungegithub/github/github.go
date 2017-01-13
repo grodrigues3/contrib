@@ -374,6 +374,11 @@ func (config *Config) Token() string {
 	return config.token
 }
 
+// Token returns the token
+func (obj *MungeObject) Token() string {
+	return obj.config.token
+}
+
 // PreExecute will initialize the Config. It MUST be run before the config
 // may be used to get information from Github
 func (config *Config) PreExecute() error {
