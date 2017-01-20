@@ -374,6 +374,11 @@ func (config *Config) Token() string {
 	return config.token
 }
 
+// Token returns the token
+func (obj *MungeObject) Token() string {
+	return obj.config.token
+}
+
 // PreExecute will initialize the Config. It MUST be run before the config
 // may be used to get information from Github
 func (config *Config) PreExecute() error {
@@ -1876,9 +1881,12 @@ func (obj *MungeObject) ListComments() ([]*github.IssueComment, bool) {
 		listOpts.ListOptions.Page = page
 		glog.V(8).Infof("Fetching page %d of comments for issue %d", page, issueNum)
 		comments, response, err := obj.config.client.Issues.ListComments(config.Org, config.Project, issueNum, listOpts)
+		glog.V(8).Infof("This is the response %+v", response)
 		config.analytics.ListComments.Call(config, response)
 		if err != nil {
+			glog.V(8).Infof("This is the error %v", err)
 			if tryNextPageAnyway {
+				glog.V(8).Infof("Try page anyway was true")
 				// Cached last page was actually truthful -- expected error.
 				break
 			}
