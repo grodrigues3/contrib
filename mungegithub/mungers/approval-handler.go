@@ -115,7 +115,8 @@ func (h *ApprovalHandler) Munge(obj *github.MungeObject) {
 		}
 	}
 
-	if !obj.HasLabel(approvedLabel) {
+	//if the label isn't there and wasn't last removed by a person
+	if !obj.HasLabel(approvedLabel) && !humanRemovedApproved(obj) {
 		obj.AddLabel(approvedLabel)
 	}
 }
@@ -132,6 +133,20 @@ func humanAddedApproved(obj *github.MungeObject) bool {
 		return false
 	}
 	return *lastAdded.Actor.Login != botName
+}
+
+func humanRemovedApproved(obj *github.MungeObject) bool {
+	events, ok := obj.GetEvents()
+	if !ok {
+		return false
+	}
+	approveRemovedMatcher := event.And([]event.Matcher{event.RemoveLabel{}, event.LabelName(approvedLabel)})
+	labelEvents := event.FilterEvents(events, approveRemovedMatcher)
+	lastRemoved := labelEvents.GetLast()
+	if lastRemoved == nil || lastRemoved.Actor == nil || lastRemoved.Actor.Login == nil {
+		return false
+	}
+	return *lastRemoved.Actor.Login != botName
 }
 
 func (h *ApprovalHandler) updateNotification(obj *github.MungeObject, ownersMap map[string]sets.String) error {
