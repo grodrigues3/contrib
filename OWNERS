@@ -1,8 +1,9 @@
 approvers:
-- bprashanth
-- eparis
-- lavalamp
+- grodrigues3
 reviewers:
 - bprashanth
 - eparis
 - lavalamp
+ownerless:
+- .gitignore
+- README.md
