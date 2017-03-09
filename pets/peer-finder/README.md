@@ -1,3 +1,4 @@
+test
 # Peer finder
 
 This is a simple peer finder daemon that is useful with StatefulSet and related use cases.
